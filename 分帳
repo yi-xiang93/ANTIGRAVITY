@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>🎈 Antigravity Split</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <style>
+        /* Antigravity Animation */
+        @keyframes antigravityShatter {
+            0% { transform: translate(0, 0) rotate(0deg) scale(1); opacity: 1; filter: blur(0px); }
+            30% { transform: translate(calc(var(--tx) * 0.1), -10vh) rotate(calc(var(--r) * 0.3)) scale(1.05); opacity: 0.9; }
+            100% { transform: translate(var(--tx), -120vh) rotate(var(--r)) scale(0.2); opacity: 0; filter: blur(8px); }
+        }
+        .fly-away {
+            animation: antigravityShatter 1.5s cubic-bezier(0.55, 0.085, 0.68, 0.53) forwards;
+            pointer-events: none;
+            position: relative;
+            z-index: 50;
+        }
+        
+        /* Modal slide up */
+        @keyframes slideUp {
+            from { transform: translateY(100%); }
+            to { transform: translateY(0); }
+        }
+        .slide-up {
+            animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        /* Hide scrollbar for clean UI */
+        ::-webkit-scrollbar { display: none; }
+        * { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        /* List Transitions */
+        .list-enter-active,
+        .list-leave-active {
+            transition: all 0.3s ease;
+        }
+        .list-enter-from,
+        .list-leave-to {
+            opacity: 0;
+            transform: scale(0.9);
+        }
+        
+        body { background-color: #f8fafc; }
+    </style>
+</head>
+<body class="text-slate-800 font-sans antialiased overflow-x-hidden selection:bg-indigo-100">
+    <div id="app" class="max-w-md mx-auto min-h-screen bg-white shadow-2xl relative pb-32">
+        
+        <!-- Header -->
+        <header class="bg-white/90 backdrop-blur-md sticky top-0 z-30 px-6 py-4 border-b border-slate-100 flex justify-between items-center">
+            <h1 class="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
+                🎈 {{ t('appName') }}
+            </h1>
+            <button @click="showSettingsModal = true" class="p-2 bg-slate-50 hover:bg-slate-100 rounded-full transition-colors text-xl">
+               ⚙️
+            </button>
+        </header>
+
+        <!-- Main List -->
+        <main class="p-4">
+            <div v-if="expenses.length === 0" class="text-center py-24 opacity-40">
+                <div class="text-7xl mb-6 animate-bounce" style="animation-duration: 3s;">🍃</div>
+                <p class="font-bold text-lg">{{ t('noExpenses') }}</p>
+            </div>
+
+            <div v-else>
+                <div class="flex justify-between items-center mb-4 px-2">
+                    <h2 class="font-bold text-slate-400 text-sm uppercase tracking-wider">{{ t('expenses') }} ({{expenses.length}})</h2>
+                    <button @click="toggleSelectAll" class="text-indigo-500 font-bold text-sm bg-indigo-50 px-3 py-1 rounded-full">{{ selectedExpenses.length === expenses.length ? t('cancel') : t('selectAll') }}</button>
+                </div>
+                
+                <transition-group name="list" tag="div" class="relative flex flex-col gap-3">
+                    <div v-for="exp in expenses" :key="exp.id" :id="'exp-'+exp.id"
+                         @click="toggleSelect(exp.id)"
+                         class="p-4 rounded-2xl border-2 transition-all cursor-pointer relative bg-white flex justify-between items-center"
+                         :class="selectedExpenses.includes(exp.id) ? 'border-indigo-500 shadow-md ring-4 ring-indigo-50' : 'border-slate-100 shadow-sm hover:border-slate-200'">
+                        
+                        <div class="flex-1">
+                            <div class="flex justify-between items-start mb-1">
+                                <h3 class="font-bold text-lg text-slate-800">{{exp.title}}</h3>
+                                <span class="font-black text-lg text-indigo-600">{{exp.currency}} {{exp.amount}}</span>
+                            </div>
+                            <div class="text-sm text-slate-500 mb-2 flex items-center gap-2">
+                                <span><span class="font-bold text-slate-700">{{exp.payer}}</span> {{ t('payer') }}</span>
+                                <span v-if="exp.date" class="text-xs bg-slate-100 px-2 py-0.5 rounded-full text-slate-400 font-bold">{{exp.date}}</span>
+                            </div>
+                            <div class="flex flex-wrap gap-1">
+                                <span v-for="s in exp.splits" :key="s" class="text-xs font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md">
+                                    {{s}}
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="ml-4 w-8 h-8 rounded-full border-2 flex items-center justify-center transition-colors shrink-0"
+                             :class="selectedExpenses.includes(exp.id) ? 'bg-indigo-500 border-indigo-500' : 'border-slate-200'">
+                            <svg v-if="selectedExpenses.includes(exp.id)" class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
+                            </svg>
+                        </div>
+                        
+                        <!-- Delete Button -->
+                        <button @click.stop="deleteExpense(exp.id)" class="absolute -top-2 -right-2 bg-red-100 text-red-500 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold opacity-0 hover:opacity-100 transition-opacity" style="opacity: selectedExpenses.includes(exp.id) ? 0 : '';">
+                            ✕
+                        </button>
+                    </div>
+                </transition-group>
+            </div>
+        </main>
+
+        <!-- Bottom Action Bar -->
+        <div class="fixed bottom-0 w-full max-w-md bg-white/90 backdrop-blur-lg border-t border-slate-100 p-4 pb-8 z-20 flex gap-3 shadow-[0_-10px_40px_rgba(0,0,0,0.08)]">
+            <button @click="openAddModal" class="w-[72px] h-[72px] bg-slate-800 text-white rounded-[24px] flex items-center justify-center font-black text-4xl shadow-xl shadow-slate-300 active:scale-95 transition-transform shrink-0">
+                +
+            </button>
+            
+            <div class="flex-1 flex gap-2">
+                <button v-if="selectedExpenses.length > 0" @click="settle('selected')" class="flex-1 bg-indigo-50 text-indigo-600 border-2 border-indigo-100 rounded-[24px] font-black text-lg active:scale-95 transition-transform flex flex-col items-center justify-center">
+                    <span>{{ t('settleSelected') }}</span>
+                    <span class="text-xs font-bold bg-indigo-200 text-indigo-800 px-2 rounded-full mt-1">{{selectedExpenses.length}}</span>
+                </button>
+                
+                <button @click="settle('all')" class="flex-1 bg-slate-800 text-white rounded-[24px] font-black text-lg active:scale-95 transition-transform shadow-md flex flex-col items-center justify-center relative overflow-hidden" :class="selectedExpenses.length > 0 ? 'hidden' : ''">
+                    <span class="relative z-10 text-xl tracking-wide flex flex-col items-center">
+                        <span class="text-2xl mb-1">🚀</span>
+                        {{ t('settleAll') }}
+                    </span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Add Expense Modal -->
+        <div v-if="showAddModal" class="fixed inset-0 z-50 flex items-end bg-slate-900/40 backdrop-blur-sm">
+            <div class="bg-white w-full rounded-t-[32px] p-6 shadow-2xl max-h-[90vh] overflow-y-auto slide-up">
+                <div class="flex justify-between items-center mb-8">
+                    <h2 class="text-2xl font-black text-slate-800">{{ t('addExpense') }}</h2>
+                    <button @click="showAddModal = false" class="w-10 h-10 bg-slate-100 text-slate-500 rounded-full font-bold text-lg flex items-center justify-center active:scale-90">✕</button>
+                </div>
+                
+                <div class="flex gap-3 mb-5">
+                    <div class="flex-1">
+                        <label class="block font-bold text-slate-500 mb-2 text-sm">{{ t('expenseName') }}</label>
+                        <input v-model="newExp.title" class="w-full p-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-indigo-500 focus:bg-white outline-none text-xl font-bold transition-all" placeholder="🍣 Sushi...">
+                    </div>
+                    <div class="w-[140px]">
+                        <label class="block font-bold text-slate-500 mb-2 text-sm">{{ t('date') }}</label>
+                        <input type="date" v-model="newExp.date" class="w-full p-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-indigo-500 outline-none font-bold text-sm text-slate-600 transition-all h-[64px] tracking-tighter">
+                    </div>
+                </div>
+
+                <div class="flex gap-4 mb-5">
+                    <div class="flex-1">
+                        <label class="block font-bold text-slate-500 mb-2 text-sm">{{ t('amount') }}</label>
+                        <input type="number" inputmode="decimal" v-model="newExp.amount" class="w-full p-4 rounded-2xl bg-indigo-50 border-2 border-transparent focus:border-indigo-500 outline-none text-2xl font-black text-indigo-600 transition-all placeholder-indigo-300" placeholder="0">
+                    </div>
+                    <div class="w-[120px]">
+                        <label class="block font-bold text-slate-500 mb-2 text-sm">{{ t('currency') }}</label>
+                        <select v-model="newExp.currency" class="w-full p-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-indigo-500 outline-none font-black text-lg transition-all appearance-none">
+                            <option :value="baseCurrency">{{baseCurrency}}</option>
+                            <option v-for="cur in Object.keys(rates).filter(c => c !== baseCurrency)" :key="cur" :value="cur">{{cur}}</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="mb-5">
+                    <label class="block font-bold text-slate-500 mb-2 text-sm">{{ t('payerTitle') }}</label>
+                    <div class="flex gap-2 overflow-x-auto pb-2 -mx-2 px-2 snap-x">
+                        <button v-for="m in members" :key="m" @click="newExp.payer = m" 
+                                class="snap-start shrink-0 px-6 py-3 rounded-2xl font-bold border-2 transition-all"
+                                :class="newExp.payer === m ? 'border-indigo-500 bg-indigo-500 text-white shadow-md' : 'border-slate-100 bg-white text-slate-600'">
+                            {{m}}
+                        </button>
+                        <button @click="promptAddMember" class="snap-start shrink-0 px-6 py-3 rounded-2xl font-bold border-2 border-dashed border-slate-300 text-slate-400 bg-slate-50 hover:bg-slate-100 transition-all flex items-center justify-center">
+                            +
+                        </button>
+                    </div>
+                </div>
+
+                <div class="mb-8">
+                    <label class="block font-bold text-slate-500 mb-2 text-sm flex justify-between items-center">
+                        <span>{{ t('splitAmong') }}</span>
+                        <button @click="newExp.splits = [...members]" class="text-indigo-500 font-bold bg-indigo-50 px-3 py-1 rounded-full">{{ t('selectAll') }}</button>
+                    </label>
+                    <div class="grid grid-cols-2 gap-3">
+                        <label v-for="m in members" :key="m" class="flex items-center gap-3 p-4 rounded-2xl border-2 cursor-pointer transition-all select-none" 
+                               :class="newExp.splits.includes(m) ? 'border-indigo-500 bg-indigo-50' : 'border-slate-100 bg-white'">
+                            <input type="checkbox" v-model="newExp.splits" :value="m" class="hidden">
+                            <div class="w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0" :class="newExp.splits.includes(m) ? 'bg-indigo-500 border-indigo-500' : 'border-slate-300'">
+                                <svg v-if="newExp.splits.includes(m)" class="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="4" d="M5 13l4 4L19 7" /></svg>
+                            </div>
+                            <span class="font-bold text-lg" :class="newExp.splits.includes(m) ? 'text-indigo-900' : 'text-slate-600'">{{m}}</span>
+                        </label>
+                    </div>
+                </div>
+
+                <button @click="saveExpense" class="w-full bg-slate-800 text-white py-5 rounded-2xl font-black text-xl active:scale-95 transition-transform shadow-xl shadow-slate-200">
+                    {{ t('save') }}
+                </button>
+            </div>
+        </div>
+
+        <!-- Settings Modal -->
+        <div v-if="showSettingsModal" class="fixed inset-0 z-50 flex items-end bg-slate-900/40 backdrop-blur-sm">
+            <div class="bg-white w-full rounded-t-[32px] p-6 shadow-2xl max-h-[90vh] overflow-y-auto slide-up">
+                <div class="flex justify-between items-center mb-8">
+                    <h2 class="text-2xl font-black text-slate-800">{{ t('settings') }}</h2>
+                    <button @click="showSettingsModal = false" class="w-10 h-10 bg-slate-100 text-slate-500 rounded-full font-bold text-lg flex items-center justify-center active:scale-90">✕</button>
+                </div>
+                
+                <!-- Language -->
+                <div class="mb-8">
+                    <label class="block font-bold text-slate-500 mb-3 text-sm">{{ t('language') }}</label>
+                    <div class="flex gap-2 p-1 bg-slate-100 rounded-2xl">
+                        <button v-for="l in ['zh-TW', 'zh-CN', 'en']" :key="l" @click="lang = l" 
+                                class="flex-1 py-2 rounded-xl font-bold text-sm transition-all"
+                                :class="lang === l ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500'">
+                            {{ l === 'zh-TW' ? '繁體' : l === 'zh-CN' ? '简体' : 'EN' }}
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Members -->
+                <div class="mb-8">
+                    <label class="block font-bold text-slate-500 mb-3 text-sm">{{ t('members') }}</label>
+                    <div class="flex flex-wrap gap-2 mb-3">
+                        <div v-for="m in members" :key="m" class="bg-indigo-50 text-indigo-800 pl-4 pr-1 py-1 rounded-full flex items-center gap-2 border border-indigo-100 font-bold">
+                            {{m}} 
+                            <button @click="removeMember(m)" class="w-6 h-6 bg-indigo-200/50 rounded-full flex items-center justify-center text-indigo-500 hover:bg-indigo-200 transition-colors">✕</button>
+                        </div>
+                    </div>
+                    <div class="flex gap-2">
+                        <input v-model="newMemberName" @keyup.enter="addMember" class="flex-1 p-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-indigo-500 outline-none font-bold" :placeholder="t('addMemberPlaceholder')">
+                        <button @click="addMember" class="w-14 bg-slate-800 text-white rounded-2xl font-black text-2xl active:scale-95 transition-transform">+</button>
+                    </div>
+                </div>
+
+                <!-- Currency -->
+                <div class="mb-8">
+                    <label class="block font-bold text-slate-500 mb-3 text-sm">{{ t('baseCurrency') }}</label>
+                    <select v-model="baseCurrency" class="w-full p-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-indigo-500 outline-none font-black text-xl mb-6 appearance-none">
+                        <option v-for="c in availableCurrencies" :key="c.code" :value="c.code">{{c.code}} - {{c.name}}</option>
+                    </select>
+                    
+                    <label class="block font-bold text-slate-500 mb-3 text-sm">{{ t('exchangeRates') }}</label>
+                    <div v-for="cur in Object.keys(rates).filter(c => c !== baseCurrency)" :key="cur" class="flex items-center gap-3 mb-3 bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                        <span class="w-16 font-black text-slate-400">1 {{cur}}</span>
+                        <span class="text-slate-300 font-bold">=</span>
+                        <input type="number" step="0.001" v-model="rates[cur]" class="flex-1 p-2 rounded-xl bg-white border border-slate-200 text-right font-bold text-indigo-600 outline-none focus:border-indigo-500">
+                        <span class="font-black text-slate-400">{{baseCurrency}}</span>
+                        <button @click="deleteCurrency(cur)" class="w-8 h-8 flex items-center justify-center text-red-400 font-bold bg-red-50 rounded-full ml-1">✕</button>
+                    </div>
+                    
+                    <div class="flex gap-2 mt-4">
+                        <select v-model="newCurrency" class="w-[140px] p-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-indigo-500 outline-none font-bold appearance-none text-slate-700">
+                            <option value="" disabled>選擇...</option>
+                            <option v-for="c in availableCurrencies" :key="c.code" :value="c.code">{{c.code}} ({{c.name}})</option>
+                        </select>
+                        <input type="number" v-model="newRate" class="flex-1 p-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-indigo-500 outline-none text-right font-bold placeholder-slate-400" placeholder="0.00">
+                        <button @click="addCurrency" class="w-14 bg-slate-800 text-white rounded-2xl font-black text-2xl active:scale-95 transition-transform">+</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Result Modal Content -->
+        <div v-if="showResultModal" class="fixed inset-0 z-50 bg-slate-50 overflow-y-auto">
+            <div class="p-4 max-w-2xl mx-auto min-h-screen flex flex-col pt-12">
+
+                <div class="bg-white p-6 sm:p-8 rounded-[32px] shadow-sm text-slate-800 border border-slate-100 relative overflow-hidden">
+                    
+                    <h1 class="text-3xl font-black mb-8 text-center text-slate-800 tracking-tight">{{ t('resultTitle') }}</h1>
+                    
+                    <div v-if="settlementTransactions.length === 0" class="text-center py-8 text-slate-500 font-bold">
+                        大家互不相欠，完美！
+                    </div>
+                    
+                    <div v-else>
+                        <h2 class="text-sm font-black text-slate-400 tracking-widest uppercase mb-4">{{ t('transferList') }}</h2>
+                        <div class="flex flex-col gap-3 mb-8">
+                            <div v-for="(tx, i) in settlementTransactions" :key="i" class="flex items-center bg-indigo-50/50 p-4 rounded-2xl border border-indigo-100">
+                                <span class="font-black text-lg text-slate-700 w-1/3 text-right">{{tx.from}}</span>
+                                <div class="w-1/3 flex flex-col items-center justify-center">
+                                    <span class="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">{{ t('whoOwesWhom') }}</span>
+                                    <svg class="w-6 h-6 text-indigo-400 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
+                                </div>
+                                <span class="font-black text-lg text-slate-700 w-1/3">{{tx.to}}</span>
+                                <span class="font-black text-2xl text-indigo-600 ml-auto whitespace-nowrap pl-4">{{baseCurrency}} {{tx.amount}}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h2 class="text-sm font-black text-slate-400 tracking-widest uppercase mb-4 border-t border-slate-100 pt-8">{{ t('includedExpenses') }} ({{settledItemsDetails.length}})</h2>
+                    <div class="flex flex-col gap-0">
+                        <div v-for="(exp, i) in settledItemsDetails" :key="i" class="py-3 border-b border-slate-50 flex justify-between items-center last:border-0">
+                            <div>
+                                <p class="font-bold text-slate-700">{{exp.title}}</p>
+                                <p class="text-xs text-slate-400 mt-1"><span class="font-bold text-slate-500">{{exp.payer}}</span> 代墊 <span v-if="exp.date">({{exp.date}})</span> • 分攤: {{exp.splits.join(', ')}}</p>
+                            </div>
+                            <div class="font-black text-slate-600">
+                                {{exp.currency}} {{exp.amount}}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-8 flex pb-8">
+                    <button @click="showResultModal = false" class="w-full bg-slate-800 text-white py-5 rounded-2xl font-black text-lg active:scale-95 transition-transform flex justify-center items-center">
+                        {{ t('close') }}
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const { createApp, ref, computed, watch } = Vue;
+
+        const i18n = {
+            'zh-TW': {
+                appName: '無重力分帳',
+                addExpense: '記一筆',
+                settings: '偏好設定',
+                members: '同行夥伴',
+                addMemberPlaceholder: '輸入名字',
+                baseCurrency: '主要幣別 (結算用)',
+                exchangeRates: '匯率 (1 外幣 = 多少主要幣別)',
+                expenseName: '花在哪？',
+                amount: '多少錢？',
+                currency: '幣別',
+                payerTitle: '誰付的？',
+                payer: '付',
+                splitAmong: '誰要分攤？',
+                save: '拋上雲端！',
+                cancel: '取消',
+                noExpenses: '清清爽爽，目前沒有帳目！',
+                settleSelected: '結算選中',
+                settleAll: '終極結算',
+                resultTitle: '✨ 完美結算 ✨',
+                whoOwesWhom: 'PAY TO',
+                close: '關閉',
+                transferList: '匯款清單',
+                includedExpenses: '包含的明細',
+                selectAll: '全選',
+                expenses: '待結算清單',
+                date: '日期'
+            },
+            'zh-CN': {
+                appName: '无重力分账',
+                addExpense: '记一笔',
+                settings: '偏好设置',
+                members: '同行伙伴',
+                addMemberPlaceholder: '输入名字',
+                baseCurrency: '主要币种 (结算用)',
+                exchangeRates: '汇率 (1 外币 = 多少主要币种)',
+                expenseName: '花在哪？',
+                amount: '多少钱？',
+                currency: '币种',
+                payerTitle: '谁付的？',
+                payer: '付',
+                splitAmong: '谁要分摊？',
+                save: '抛上云端！',
+                cancel: '取消',
+                noExpenses: '清清爽爽，目前没有账目！',
+                settleSelected: '结算选中',
+                settleAll: '终极结算',
+                resultTitle: '✨ 完美结算 ✨',
+                whoOwesWhom: 'PAY TO',
+                close: '关闭',
+                transferList: '汇款清单',
+                includedExpenses: '包含的明细',
+                selectAll: '全选',
+                expenses: '待结算清单',
+                date: '日期'
+            },
+            'en': {
+                appName: 'Antigravity',
+                addExpense: 'Add Expense',
+                settings: 'Settings',
+                members: 'Travel Mates',
+                addMemberPlaceholder: 'Name...',
+                baseCurrency: 'Base Currency',
+                exchangeRates: 'Rates (1 XX = ? Base)',
+                expenseName: 'What for?',
+                amount: 'Amount',
+                currency: 'Currency',
+                payerTitle: 'Who paid?',
+                payer: 'paid',
+                splitAmong: 'Split among?',
+                save: 'Float it!',
+                cancel: 'Cancel',
+                noExpenses: 'All clear! Nothing pending.',
+                settleSelected: 'Settle',
+                settleAll: 'Ultimate Settle',
+                resultTitle: '✨ All Settled ✨',
+                whoOwesWhom: 'PAY TO',
+                close: 'Close',
+                transferList: 'Transfers',
+                includedExpenses: 'Included Expenses',
+                selectAll: 'All',
+                expenses: 'Pending',
+                date: 'Date'
+            }
+        };
+
+        createApp({
+            setup() {
+                const lang = ref('zh-TW');
+                const baseCurrency = ref('TWD');
+                const rates = ref({ TWD: 1, JPY: 0.21, HKD: 4.1, USD: 32 });
+                const members = ref(['Me', 'Friend']);
+                const expenses = ref([]);
+                
+                const showAddModal = ref(false);
+                const showSettingsModal = ref(false);
+                const showResultModal = ref(false);
+                const selectedExpenses = ref([]);
+                
+                const settlementTransactions = ref([]);
+                const settledItemsDetails = ref([]);
+
+                const getToday = () => {
+                    const d = new Date();
+                    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+                };
+                const newExp = ref({ title: '', amount: '', currency: 'TWD', payer: '', splits: [], date: getToday() });
+                const newMemberName = ref('');
+                const newCurrency = ref('');
+                const newRate = ref('');
+
+                const availableCurrencies = ref([
+                    { code: 'TWD', name: '新台幣' }, { code: 'JPY', name: '日圓' }, { code: 'KRW', name: '韓元' },
+                    { code: 'USD', name: '美元' }, { code: 'EUR', name: '歐元' }, { code: 'HKD', name: '港幣' },
+                    { code: 'CNY', name: '人民幣' }, { code: 'GBP', name: '英鎊' }, { code: 'AUD', name: '澳幣' },
+                    { code: 'CAD', name: '加幣' }, { code: 'SGD', name: '新加坡幣' }, { code: 'CHF', name: '瑞士法郎' },
+                    { code: 'MYR', name: '馬來西亞令吉' }, { code: 'THB', name: '泰銖' }, { code: 'PHP', name: '菲律賓披索' },
+                    { code: 'IDR', name: '印尼盾' }, { code: 'VND', name: '越南盾' }, { code: 'NZD', name: '紐西蘭幣' },
+                    { code: 'MOP', name: '澳門幣' }, { code: 'INR', name: '印度盧比' }, { code: 'AED', name: '阿聯酋迪拉姆' }
+                ]);
+
+                // Persistence
+                const loadData = () => {
+                    const data = localStorage.getItem('antigravity_data');
+                    if (data) {
+                        try {
+                            const parsed = JSON.parse(data);
+                            lang.value = parsed.lang || 'zh-TW';
+                            baseCurrency.value = parsed.baseCurrency || 'TWD';
+                            rates.value = parsed.rates || { TWD: 1, JPY: 0.21, HKD: 4.1, USD: 32 };
+                            members.value = parsed.members || ['Me', 'Friend'];
+                            expenses.value = parsed.expenses || [];
+                        } catch(e) {}
+                    }
+                };
+                
+                watch([lang, baseCurrency, rates, members, expenses], () => {
+                    rates.value[baseCurrency.value] = 1; // ensure base rate is always 1
+                    localStorage.setItem('antigravity_data', JSON.stringify({
+                        lang: lang.value,
+                        baseCurrency: baseCurrency.value,
+                        rates: rates.value,
+                        members: members.value,
+                        expenses: expenses.value
+                    }));
+                }, { deep: true });
+
+                loadData();
+
+                const t = computed(() => (key) => i18n[lang.value][key] || key);
+
+                const openAddModal = () => {
+                    if (members.value.length === 0) {
+                        alert(lang.value === 'en' ? 'Please add members in settings first.' : '請先在設定中新增夥伴。');
+                        return;
+                    }
+                    newExp.value = { 
+                        title: '', 
+                        amount: '', 
+                        currency: baseCurrency.value, 
+                        payer: members.value[0], 
+                        splits: [...members.value],
+                        date: getToday()
+                    };
+                    showAddModal.value = true;
+                };
+
+                const saveExpense = () => {
+                    if (!newExp.value.title || !newExp.value.amount || !newExp.value.payer || newExp.value.splits.length === 0) {
+                        return; // Basic validation
+                    }
+                    expenses.value.unshift({ // Add to top
+                        id: Date.now(),
+                        title: newExp.value.title,
+                        amount: parseFloat(newExp.value.amount),
+                        currency: newExp.value.currency,
+                        payer: newExp.value.payer,
+                        splits: [...newExp.value.splits],
+                        date: newExp.value.date || getToday()
+                    });
+                    showAddModal.value = false;
+                };
+
+                const deleteExpense = (id) => {
+                    expenses.value = expenses.value.filter(e => e.id !== id);
+                    selectedExpenses.value = selectedExpenses.value.filter(sid => sid !== id);
+                };
+
+                const toggleSelect = (id) => {
+                    if (selectedExpenses.value.includes(id)) {
+                        selectedExpenses.value = selectedExpenses.value.filter(sid => sid !== id);
+                    } else {
+                        selectedExpenses.value.push(id);
+                    }
+                };
+
+                const promptAddMember = () => {
+                    const name = prompt(lang.value === 'en' ? 'Enter new member name:' : '輸入新夥伴名字：');
+                    if (name && name.trim() && !members.value.includes(name.trim())) {
+                        members.value.push(name.trim());
+                        newExp.value.payer = name.trim();
+                        if(!newExp.value.splits.includes(name.trim())) {
+                            newExp.value.splits.push(name.trim());
+                        }
+                    }
+                };
+
+                const toggleSelectAll = () => {
+                    if (selectedExpenses.value.length === expenses.value.length) {
+                        selectedExpenses.value = [];
+                    } else {
+                        selectedExpenses.value = expenses.value.map(e => e.id);
+                    }
+                };
+
+                const addMember = () => {
+                    const name = newMemberName.value.trim();
+                    if (name && !members.value.includes(name)) {
+                        members.value.push(name);
+                    }
+                    newMemberName.value = '';
+                };
+
+                const removeMember = (name) => {
+                    members.value = members.value.filter(m => m !== name);
+                    // auto fix splits/payers
+                    expenses.value.forEach(e => {
+                        if(e.payer === name) e.payer = members.value[0] || '';
+                        e.splits = e.splits.filter(s => s !== name);
+                    });
+                };
+
+                const addCurrency = () => {
+                    const c = newCurrency.value.trim().toUpperCase();
+                    const r = parseFloat(newRate.value);
+                    if (c && !isNaN(r)) {
+                        rates.value[c] = r;
+                    }
+                    newCurrency.value = '';
+                    newRate.value = '';
+                };
+
+                const deleteCurrency = (c) => {
+                    delete rates.value[c];
+                };
+
+                const calculateSettlement = (items) => {
+                    const balances = {};
+                    members.value.forEach(m => balances[m] = 0);
+
+                    items.forEach(exp => {
+                        const rate = rates.value[exp.currency] || 1;
+                        const amountInBase = exp.amount * rate;
+                        
+                        if (balances[exp.payer] === undefined) balances[exp.payer] = 0;
+                        balances[exp.payer] += amountInBase;
+
+                        if(exp.splits.length > 0) {
+                            const splitAmount = amountInBase / exp.splits.length;
+                            exp.splits.forEach(person => {
+                                if (balances[person] === undefined) balances[person] = 0;
+                                balances[person] -= splitAmount;
+                            });
+                        }
+                    });
+
+                    const debtors = [];
+                    const creditors = [];
+
+                    for (const [person, balance] of Object.entries(balances)) {
+                        if (balance < -0.01) debtors.push({ person, amount: -balance });
+                        else if (balance > 0.01) creditors.push({ person, amount: balance });
+                    }
+
+                    debtors.sort((a, b) => b.amount - a.amount);
+                    creditors.sort((a, b) => b.amount - a.amount);
+
+                    const txs = [];
+                    let d = 0, c = 0;
+
+                    while (d < debtors.length && c < creditors.length) {
+                        const debtor = debtors[d];
+                        const creditor = creditors[c];
+                        const settleAmount = Math.min(debtor.amount, creditor.amount);
+
+                        txs.push({
+                            from: debtor.person,
+                            to: creditor.person,
+                            amount: settleAmount.toFixed(2)
+                        });
+
+                        debtor.amount -= settleAmount;
+                        creditor.amount -= settleAmount;
+
+                        if (debtor.amount < 0.01) d++;
+                        if (creditor.amount < 0.01) c++;
+                    }
+
+                    return txs;
+                };
+
+                const settle = (type) => {
+                    let itemsToSettle = [];
+                    if (type === 'all') {
+                        itemsToSettle = [...expenses.value];
+                        selectedExpenses.value = itemsToSettle.map(e => e.id);
+                    } else {
+                        itemsToSettle = expenses.value.filter(e => selectedExpenses.value.includes(e.id));
+                    }
+
+                    if (itemsToSettle.length === 0) return;
+
+                    settledItemsDetails.value = JSON.parse(JSON.stringify(itemsToSettle));
+                    settlementTransactions.value = calculateSettlement(itemsToSettle);
+                    
+                    // Antigravity Animation
+                    itemsToSettle.forEach(exp => {
+                        const el = document.getElementById(`exp-${exp.id}`);
+                        if (el) {
+                            el.classList.add('fly-away');
+                            el.style.setProperty('--tx', `${(Math.random() - 0.5) * 300}px`);
+                            el.style.setProperty('--r', `${(Math.random() - 0.5) * 90}deg`);
+                        }
+                    });
+
+                    // Wait for animation
+                    setTimeout(() => {
+                        expenses.value = expenses.value.filter(e => !selectedExpenses.value.includes(e.id));
+                        selectedExpenses.value = [];
+                        showResultModal.value = true;
+                    }, 1400); 
+                };
+
+                return {
+                    lang, baseCurrency, rates, members, expenses, t,
+                    showAddModal, showSettingsModal, showResultModal,
+                    newExp, newMemberName, newCurrency, newRate, availableCurrencies,
+                    selectedExpenses, settlementTransactions, settledItemsDetails,
+                    openAddModal, saveExpense, deleteExpense, toggleSelect, toggleSelectAll, promptAddMember,
+                    addMember, removeMember, addCurrency, deleteCurrency, settle
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
