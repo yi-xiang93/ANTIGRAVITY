@@ -37,3 +37,4 @@
 2.  國際化思維 (Global Mindset)：從架構初期即規劃多語系與多貨幣支援，展現對國際市場在地化（Localization）的敏感度。
 3.  敏捷產品開發 (Agile Development)：獨立完成從痛點發現、PRD（產品規格書）擬定、前端 UI/UX 開發到最終上線部署的完整產品生命週期。
 
+網址 :file:///C:/Users/yixia/.gemini/antigravity/scratch/travel_app/index.html
